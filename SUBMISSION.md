@@ -94,7 +94,7 @@ flowchart TD
 - `elevator.ino` — 펌웨어 소스
 - `README.md` — 프로젝트 요약 및 핀맵
 - `SUBMISSION.md` — (이 문서)
-- 이미지 파일들: `elevator.png`, `elevator_arduino.png`, `elevator_requirement.png` (회로/요구사항 관련 스크린샷)
+- 이미지 파일들: `elevator_instruction.png`, `elevator_arduino.png`, `elevator_requirement.png` (회로/요구사항 관련 스크린샷)
 
 ## 8. 다음 단계(권장)
 
