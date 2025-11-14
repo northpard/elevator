@@ -1,11 +1,11 @@
-// Elevator sketch for Arduino Uno (3-floor simple simulator)
-// - 3 call buttons (with per-button LED)
-// - 3 floor LEDs (indicate elevator at that floor)
-// - 4 between-floor YELLOW LEDs (2 between 1-2, 2 between 2-3)
-// - 1 status GREEN LED
-// Button wiring assumed with INPUT_PULLUP (active LOW)
+// Arduino Uno용 엘리베이터 스케치 (3층 간단 시뮬레이터)
+// - 외부 호출 버튼 3개 (각 버튼 옆에 호출 표시 LED 포함)
+// - 엘리베이터 위치를 표시하는 층 LED 3개
+// - 층간 이동을 표시하는 YELLOW LED 4개 (1-2 구간에 2개, 2-3 구간에 2개)
+// - 상태 표시용 GREEN LED 1개 (하드웨어에 없으면 1층 LED 재사용)
+// 버튼은 INPUT_PULLUP 방식(액티브 LOW)으로 연결되어 있다고 가정합니다.
 
-// Pin mapping (change if your wiring differs)
+// 핀 매핑 (배선이 다르면 이 부분을 수정하세요)
 const int BTN_PINS[3]     = {11, 12, 13};    // call buttons for floor 1,2,3
 const int BTN_LED[3]      = {8, 9, 10};    // indicator LEDs showing button was pressed
 const int FLOOR_LED[3]    = {A0, 4, 7};   // RED LEDs indicating elevator is at floor 1,2,3
@@ -13,33 +13,33 @@ const int BETWEEN_LED[4]  = {2, 3, 5, 6}; // yellow LEDs: two for 1->2, two for 
 // No separate STATUS LED in hardware; reuse floor-1 LED pin (A0) as status indicator in code
 const int STATUS_LED      = A0;         // green/status tied to floor 1 LED pin
 
-// Timing (ms)
+// 타이밍(밀리초)
 const unsigned long DEBOUNCE_MS = 50;
 const unsigned long MOVE_STEP_MS = 350; // time per between-floor yellow LED step
 const unsigned long DOOR_OPEN_MS = 1000;
 
-// elevator state
-int currentFloor = 0; // 0-based (0 -> 1st floor)
+// 엘리베이터 상태
+int currentFloor = 0; // 0 기반 인덱스 (0 -> 1층)
 bool requested[3] = {false, false, false};
 
-// input debouncing
+// 입력 디바운스 처리
 unsigned long lastBtnTime[3] = {0,0,0};
 int lastBtnState[3] = {HIGH, HIGH, HIGH};
-// press timing for long-press cancel
+// 긴 누름(호출 취소) 판정용 누름 시작 시간
 unsigned long pressStartMillis[3] = {0,0,0};
-const unsigned long LONG_PRESS_MS = 1000; // hold 1000ms to cancel
+const unsigned long LONG_PRESS_MS = 1000; // >=1000ms 누르면 취소로 판정
 bool canceledWhileHold[3] = {false, false, false};
-// cancel protection (glitch prevention): after cancel, block re-registration briefly
-const unsigned long CANCEL_PROTECT_MS = 500; // ms
+// 취소 보호시간(글리치 방지): 취소 직후 짧게 재등록을 차단
+const unsigned long CANCEL_PROTECT_MS = 500; // 밀리초
 unsigned long cancelProtectUntil[3] = {0,0,0};
-// UX: blink feedback when cancel happens
-const unsigned long BLINK_INTERVAL_MS = 100; // ms per on/off
-const int BLINK_PHASES = 4; // on/off cycles (2 blinks = 4 phases)
+// UX: 취소 시 버튼 LED 깜빡임 피드백
+const unsigned long BLINK_INTERVAL_MS = 100; // 깜빡임 온/오프 간격 (ms)
+const int BLINK_PHASES = 4; // 깜빡임 단계 수 (2회 깜빡임 = 4 단계)
 bool blinkActive[3] = {false, false, false};
 unsigned long blinkToggleNext[3] = {0,0,0};
 int blinkPhase[3] = {0,0,0};
 
-// movement state machine
+// 이동 상태 머신
 enum MoveState { IDLE, MOVING_UP, MOVING_DOWN, ARRIVING };
 MoveState moveState = IDLE;
 //int targetFloor = -1;
@@ -49,7 +49,7 @@ unsigned long arrivedMillis = 0;
 MoveState lastMoveDirection = IDLE; // remembers direction while arriving
 
 void setup() {
-  // pins
+  // 핀 초기화
   for (int i=0;i<3;i++) {
     pinMode(BTN_PINS[i], INPUT_PULLUP);
     pinMode(BTN_LED[i], OUTPUT);
@@ -65,7 +65,7 @@ void setup() {
   digitalWrite(STATUS_LED, LOW);
 
   Serial.begin(9600);
-  // show initial floor
+  // 초기 층 표시
   updateFloorLeds();
 }
 
@@ -76,7 +76,7 @@ void loop() {
   runMovement();
 }
 
-// Update blinking state machine for button LEDs (non-blocking)
+// 버튼 LED 깜빡임 상태 머신 업데이트 (비차단)
 void updateBlinkStates(){
   unsigned long now = millis();
   for (int i=0;i<3;i++){
@@ -96,9 +96,9 @@ void updateBlinkStates(){
   }
 }
 
-// Read buttons with debounce; active LOW
-// Short press (release quickly) => register request (turn on button LED)
-// Long press (hold >= LONG_PRESS_MS then release) => cancel request (turn off button LED)
+// 버튼 읽기(디바운스 적용), 액티브 LOW
+// 짧게 누름(빠르게 뗌) -> 호출 등록 (버튼 LED ON)
+// 길게 누름(>= LONG_PRESS_MS) -> 호출 취소 (버튼 LED 깜빡임 후 OFF)
 void readButtons(){
   for(int i=0;i<3;i++){
     int reading = digitalRead(BTN_PINS[i]);
@@ -176,7 +176,7 @@ void readButtons(){
   }
 }
 
-// If idle, pick next requested floor (simple policy: nearest, prefer up if tie)
+// 대기 상태(IDLE)인 경우 다음 이동 목표 선택 (간단한 정책: 가장 가까운 층, 동률이면 위 방향 우선)
 void scheduleNextTargetIfIdle(){
   if (moveState != IDLE) return;
   int best = -1;
@@ -200,13 +200,14 @@ void scheduleNextTargetIfIdle(){
   }
 }
 
+// 엘리베이터 이동 처리 (비차단 상태머신)
 void runMovement(){
   if (moveState == IDLE) return;
 
   unsigned long now = millis();
 
   if (moveState == MOVING_UP){
-    // determine which between-LEDs to use
+  // 사용할 층간 LED 인덱스 결정
     int firstIdx = (currentFloor==0) ? 0 : 2; // 0..1 for 0->1, 2..3 for 1->2
     if (now - moveStepMillis >= MOVE_STEP_MS){
       // advance step
@@ -242,13 +243,11 @@ void runMovement(){
       }
     }
   } else if (moveState == ARRIVING){
-    // waiting for door open time
+    // 도착: 도어 열림 대기 시간 처리
     if (now - arrivedMillis >= DOOR_OPEN_MS){
       // finish arrival
       digitalWrite(STATUS_LED, LOW);
-      // clear floor LED after short blink
-      // turn off request and its indicator
-      // clear the request for this floor (if any)
+      // 도착 처리: 요청 소거 및 버튼 표시 LED 끄기
       if (currentFloor >=0 && currentFloor < 3){
         requested[currentFloor] = false;
         digitalWrite(BTN_LED[currentFloor], LOW);
@@ -298,8 +297,8 @@ void runMovement(){
   }
 }
 
+// 도착 처리: 층 LED 갱신, STATUS LED ON (문 열림 상태), ARRIVING 상태로 전환
 void arriveAtFloor(){
-  // indicate arrival
   updateFloorLeds();
   digitalWrite(STATUS_LED, HIGH); // green on while doors open
   arrivedMillis = millis();
@@ -307,6 +306,7 @@ void arriveAtFloor(){
   Serial.print("Arrived at floor "); Serial.println(currentFloor+1);
 }
 
+// 층 LED 상태 갱신: 현재층만 ON
 void updateFloorLeds(){
   for (int i=0;i<3;i++){
     digitalWrite(FLOOR_LED[i], (i==currentFloor) ? HIGH : LOW);
