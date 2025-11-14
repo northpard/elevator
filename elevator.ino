@@ -6,11 +6,12 @@
 // Button wiring assumed with INPUT_PULLUP (active LOW)
 
 // Pin mapping (change if your wiring differs)
-const int BTN_PINS[3]     = {2, 3, 4};    // call buttons for floor 1,2,3
-const int BTN_LED[3]      = {5, 6, 7};    // indicator LEDs showing button was pressed
-const int FLOOR_LED[3]    = {8, 9, 10};   // RED LEDs indicating elevator is at floor 1,2,3
-const int BETWEEN_LED[4]  = {11, 12, 13, A0}; // yellow LEDs: two for 1->2, two for 2->3
-const int STATUS_LED      = A1;          // green status LED
+const int BTN_PINS[3]     = {11, 12, 13};    // call buttons for floor 1,2,3
+const int BTN_LED[3]      = {8, 9, 10};    // indicator LEDs showing button was pressed
+const int FLOOR_LED[3]    = {A0, 4, 7};   // RED LEDs indicating elevator is at floor 1,2,3
+const int BETWEEN_LED[4]  = {2, 3, 5, 6}; // yellow LEDs: two for 1->2, two for 2->3
+// No separate STATUS LED in hardware; reuse floor-1 LED pin (A0) as status indicator in code
+const int STATUS_LED      = A0;         // green/status tied to floor 1 LED pin
 
 // Timing (ms)
 const unsigned long DEBOUNCE_MS = 50;
