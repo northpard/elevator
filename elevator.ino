@@ -5,17 +5,17 @@
 // - 상태 표시용 GREEN LED 1개 (하드웨어에 없으면 1층 LED 재사용)
 // 버튼은 INPUT_PULLUP 방식(액티브 LOW)으로 연결되어 있다고 가정합니다.
 
-// 핀 매핑 (배선이 다르면 이 부분을 수정하세요)
-const int BTN_PINS[3]     = {11, 12, 13};    // call buttons for floor 1,2,3
-const int BTN_LED[3]      = {8, 9, 10};    // indicator LEDs showing button was pressed
-const int FLOOR_LED[3]    = {A0, 4, 7};   // RED LEDs indicating elevator is at floor 1,2,3
-const int BETWEEN_LED[4]  = {2, 3, 5, 6}; // yellow LEDs: two for 1->2, two for 2->3
-// No separate STATUS LED in hardware; reuse floor-1 LED pin (A0) as status indicator in code
-const int STATUS_LED      = A0;         // green/status tied to floor 1 LED pin
+// 핀 매핑 (배선이 바뀌면 이 부분을 수정하세요)
+const int BTN_PINS[3]     = {11, 12, 13};    // 1층,2층,3층 호출 버튼 핀
+const int BTN_LED[3]      = {8, 9, 10};      // 호출 표시용 LED 핀(각 버튼 옆)
+const int FLOOR_LED[3]    = {A0, 4, 7};      // 층 위치 표시 RED LED 핀(1,2,3층)
+const int BETWEEN_LED[4]  = {2, 3, 5, 6};    // 층간 YELLOW LED: 1-2 구간 2개, 2-3 구간 2개
+// 하드웨어에 별도 STATUS LED가 없으므로 1층 LED(A0)를 상태 표시용으로 재사용
+const int STATUS_LED      = A0;             // 상태 표시(1층 LED와 동일)
 
 // 타이밍(밀리초)
 const unsigned long DEBOUNCE_MS = 50;
-const unsigned long MOVE_STEP_MS = 350; // time per between-floor yellow LED step
+const unsigned long MOVE_STEP_MS = 350; // 층간 YELLOW LED 단계별 시간(ms)
 const unsigned long DOOR_OPEN_MS = 1000;
 
 // 엘리베이터 상태
@@ -313,7 +313,7 @@ void updateFloorLeds(){
   }
 }
 
-// helpers to check pending requests above/below currentFloor
+// 현재층 위/아래에 대기 중인 호출이 있는지 확인하는 보조 함수들
 bool pendingAbove(){
   for (int i=currentFloor+1;i<3;i++) if (requested[i]) return true;
   return false;
