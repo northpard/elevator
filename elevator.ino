@@ -1,29 +1,25 @@
-// Arduino Uno용 엘리베이터 스케치 (3층 간단 시뮬레이터)
-// - 외부 호출 버튼 3개 (각 버튼 옆에 호출 표시 LED 포함)
-// - 엘리베이터 위치를 표시하는 층 LED 3개
-// - 층간 이동을 표시하는 YELLOW LED 4개 (1-2 구간에 2개, 2-3 구간에 2개)
-// 버튼은 PULLDOWN 방식(외부 풀다운 저항, 액티브 HIGH)으로 연결되어 있다고 가정합니다.
+// Arduino Uno용 엘리베이터 스케치 (3층 시뮬레이터)
+// - 외부 호출 버튼 3개, 각 버튼 옆에 호출 표시 LED
+// - 엘리베이터 위치를 표시하는, 층 LED 3개
+// - 층간 이동을 표시하는 YELLOW LED 4개 (1-2층에 2개, 2-3층에 2개)
+// 버튼은 PULLDOWN 방식으로 연결
 
-// 핀 매핑 (배선이 바뀌면 이 부분을 수정하세요)
+// 핀 매핑
 const int BTN_PINS[3]     = {11, 12, 13};    // 1층,2층,3층 호출 버튼 핀
-const int BTN_LED[3]      = {8, 9, 10};      // 호출 표시용 LED 핀(각 버튼 옆)
+const int BTN_LED[3]      = {8, 9, 10};      // 호출 표시용 LED 핀(각 버튼 옆에 위치)
 const int FLOOR_LED[3]    = {A0, 4, 7};      // 층 위치 표시 RED LED 핀(1,2,3층)
-const int BETWEEN_LED[4]  = {2, 3, 5, 6};    // 층간 YELLOW LED: 1-2 구간 2개, 2-3 구간 2개
+const int BETWEEN_LED[4]  = {2, 3, 5, 6};    // 층간 YELLOW LED: 1-2층 2개, 2-3층 2개
 
 // 타이밍(밀리초)
-const unsigned long DEBOUNCE_MS = 50;   // 버튼 입력이 안정되었다고 판단하는 최소 시간
 const unsigned long MOVE_STEP_MS = 1000; // 층간 YELLOW LED 단계별 시간(ms)
 const unsigned long DOOR_OPEN_MS = 1000; // 도착 후 문이 열린 상태로 유지하는 시간
 unsigned long currentDoorHoldMs = DOOR_OPEN_MS; // 현재 도어 열림 대기 시간
 
-// (디버그/테스트 코드 제거) 기본 동작에 필요한 상수만 남김
-
 // 엘리베이터 상태
 int currentFloor = 0; // 0 기반 인덱스 (0 -> 1층)
-bool requested[3] = {false, false, false};
+bool requested[3] = {false, false, false}; // 현재 호출 요청이 활성화되어 있는지 여부
 
-// 입력 디바운스 처리
-unsigned long lastBtnTime[3] = {0,0,0};
+// 입력 상태 추적 (디바운스를 제거하여 물리적 회로로 테스트합니다)
 int lastBtnState[3] = {LOW, LOW, LOW};
 // 긴 누름(호출 취소) 판정용 누름 시작 시간
 unsigned long pressStartMillis[3] = {0,0,0};
@@ -106,59 +102,44 @@ void updateBlinkStates(){
 // 버튼 읽기(디바운스 적용), 액티브 HIGH (pulldown wiring)
 // 짧게 누르면 즉시 호출 등록, 길게 누르면 취소
 void readButtons(){
-  unsigned long now = millis();
-
+  // 디바운스를 제거한 단순화된 입력 처리: 핀 상태 변화가 감지되면 즉시 처리합니다.
   for(int i=0;i<3;i++){
     int reading = digitalRead(BTN_PINS[i]);
     if (reading != lastBtnState[i]){
-      lastBtnTime[i] = millis();
+      // 상태 변화가 감지되면 즉시 업데이트하고 처리
       lastBtnState[i] = reading;
-    }
-    if ((millis() - lastBtnTime[i]) > DEBOUNCE_MS){
-      // 상태가 안정된 구간
       if (reading == HIGH){
-        // 버튼이 눌린 상태(홀드) -- pulldown: 눌림 == HIGH
+        // 버튼이 눌린 순간
         if (pressStartMillis[i] == 0){
           pressStartMillis[i] = millis();
-          pressStartedWithActiveRequest[i] = requested[i]; // 초기 상태 저장
+          pressStartedWithActiveRequest[i] = requested[i];
           unsigned long now = pressStartMillis[i];
           if (now < cancelProtectUntil[i]){
             // 취소 보호시간 내 재입력 무시
           } else if (!requested[i]){
             requested[i] = true;
-            digitalWrite(BTN_LED[i], HIGH); // 호출 등록 상태를 LED로 표시
-          } else {
-            // 이미 등록된 상태
+            digitalWrite(BTN_LED[i], HIGH);
           }
         }
         if (pressStartMillis[i] != 0){
           unsigned long heldNow = millis() - pressStartMillis[i];
           if (heldNow >= LONG_PRESS_MS && !canceledWhileHold[i] && pressStartedWithActiveRequest[i]){
-            // 누르는 중에 바로 취소 처리
             if (requested[i]){
               requested[i] = false;
-              // 깜빡임 피드백을 시작하고 종료 시 LED를 끔
               unsigned long now = millis();
               blinkActive[i] = true;
-              blinkPhase[i] = 1; // LED를 즉시 켰으므로 다음 토글에서 꺼지도록 1단계로 설정
+              blinkPhase[i] = 1;
               digitalWrite(BTN_LED[i], HIGH);
               blinkToggleNext[i] = now + BLINK_INTERVAL_MS;
-              // 즉시 재등록을 방지하기 위한 보호 시간 설정
               cancelProtectUntil[i] = now + CANCEL_PROTECT_MS;
-            } else {
-              // 취소할 호출 없음
             }
-            canceledWhileHold[i] = true; // 같은 취소 메시지가 반복되지 않도록 플래그
+            canceledWhileHold[i] = true;
           }
         }
       } else {
         // 버튼을 뗀 순간
         if (pressStartMillis[i] != 0){
           unsigned long held = millis() - pressStartMillis[i];
-          // 릴리스 시점에서는 긴 누름에 의한 취소 처리는 이미 홀드 중에 수행되었어야 함.
-          // 따라서 릴리스 시점의 추가 취소 로직은 제거하여 짧은 더블-프레스가 취소로 해석되는
-          // 경우를 방지한다.
-          // 누름 관련 상태 초기화
           pressStartMillis[i] = 0;
           canceledWhileHold[i] = false;
           pressStartedWithActiveRequest[i] = false;
