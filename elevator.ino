@@ -13,7 +13,6 @@ const int BETWEEN_LED[4]  = {2, 3, 5, 6};    // 층간 YELLOW LED: 1-2층 2개, 
 // 타이밍(밀리초)
 const unsigned long MOVE_STEP_MS = 1000; // 층간 YELLOW LED 단계별 시간(ms)
 const unsigned long DOOR_OPEN_MS = 1000; // 도착 후 문이 열린 상태로 유지하는 시간
-unsigned long currentDoorHoldMs = DOOR_OPEN_MS; // 현재 도어 열림 대기 시간
 
 // 엘리베이터 상태
 int currentFloor = 0; // 0 기반 인덱스 (0 -> 1층)
@@ -193,8 +192,8 @@ void runMovement(){
         // 층간 LED 모두 끔
         for (int i=0;i<4;i++) digitalWrite(BETWEEN_LED[i], LOW);
         lastMoveDirection = MOVING_UP;
-        unsigned long holdMs = requested[currentFloor] ? DOOR_OPEN_MS : MOVE_STEP_MS;
-        arriveAtFloor(holdMs);
+  // 항상 도착 시에는 고정 DOOR_OPEN_MS 만큼 대기하도록 변경
+  arriveAtFloor(DOOR_OPEN_MS);
       } else {
         // 다음 단계로 진행
         for (int i=0;i<4;i++) digitalWrite(BETWEEN_LED[i], LOW);
@@ -210,8 +209,8 @@ void runMovement(){
         currentFloor -= 1;
         for (int i=0;i<4;i++) digitalWrite(BETWEEN_LED[i], LOW);
         lastMoveDirection = MOVING_DOWN;
-        unsigned long holdMs = requested[currentFloor] ? DOOR_OPEN_MS : MOVE_STEP_MS;
-        arriveAtFloor(holdMs);
+  // 항상 도착 시에는 고정 DOOR_OPEN_MS 만큼 대기하도록 변경
+  arriveAtFloor(DOOR_OPEN_MS);
       } else {
         for (int i=0;i<4;i++) digitalWrite(BETWEEN_LED[i], LOW);
         // 내려가는 느낌을 주기 위해 역순으로 LED를 켬
@@ -222,7 +221,7 @@ void runMovement(){
     }
   } else if (moveState == ARRIVING){
     // 도착 처리: 도어 열림 대기 시간
-    if (now - arrivedMillis >= currentDoorHoldMs){
+    if (now - arrivedMillis >= DOOR_OPEN_MS){
       // 도착 루틴 종료
       // 도착 층의 요청을 제거하고 버튼 LED 끄기
       if (currentFloor >=0 && currentFloor < 3){
@@ -286,7 +285,8 @@ void runMovement(){
 void arriveAtFloor(unsigned long holdDurationMs){
   updateFloorLeds();
   arrivedMillis = millis();
-  currentDoorHoldMs = holdDurationMs;
+  // 고정 DOOR_OPEN_MS를 사용하므로 파라미터는 더 이상 저장하지 않음
+  (void)holdDurationMs; // unused parameter kept for compatibility
   moveState = ARRIVING;
 }
 
