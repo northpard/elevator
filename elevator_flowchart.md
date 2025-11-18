@@ -13,14 +13,14 @@ flowchart TD
   subgraph MainLoop [loop]
     Loop --> ReadButtons["readButtons()\n- debounce\n- 짧은 누름 -> 등록\n- 긴 누름 -> 취소"]
     ReadButtons --> UpdateBlink["updateBlinkStates()"]
-    UpdateBlink --> SyncLED["syncRequestLedStates()"]
-    SyncLED --> Schedule["scheduleNextTargetIfIdle()\n- IDLE이면 다음 목표 선택"]
-    Schedule --> RunMove["runMovement()\n- MOVING_UP / MOVING_DOWN / ARRIVING"]
+  UpdateBlink --> SyncLED["syncRequestLedStates()"]
+  SyncLED --> Schedule["selectNextRequestWhenStopped()\n- STOPPED이면 다음 목표 선택"]
+    Schedule --> RunMove["processMovementState()\n- MOVING_UP / MOVING_DOWN / ARRIVING"]
     RunMove --> Loop
   end
 
   subgraph Movement
-    RunMove --> IsIdle{moveState == IDLE?}
+  RunMove --> IsIdle{moveState == STOPPED?}
     IsIdle -- true --> Loop
     IsIdle -- false --> MovingUp{moveState == MOVING_UP?}
     MovingUp -- true --> MoveStepUp["층간 LED 애니메이션\nmoveStepIndex 증가\n도착 시 -> arriveAtFloor()"]
@@ -32,7 +32,7 @@ flowchart TD
     ArrivingWait -- false --> Loop
     ArrivingWait -- true --> ClearRequest["도착층 요청 클리어\nrequested[floor]=false"]
     ClearRequest --> UpdateFloorLEDs["updateFloorLeds()"]
-    UpdateFloorLEDs --> DecideNext["같은 방향 우선(pendingAbove()/pendingBelow())\n-> moveState 설정 또는 IDLE"]
+  UpdateFloorLEDs --> DecideNext["같은 방향 우선(pendingAbove()/pendingBelow())\n-> moveState 설정 또는 STOPPED"]
     DecideNext --> Loop
   end
 
@@ -42,8 +42,8 @@ flowchart TD
 
 간단 설명
 - readButtons(): 디바운스 후 짧은 누름은 즉시 요청 등록, 길게 누르면 요청 취소(깜빡임 피드백).
-- scheduleNextTargetIfIdle(): IDLE일 때 가장 가까운 요청을 선택(거리가 같으면 위쪽 우선).
-- runMovement(): 층간 LED로 애니메이션을 보여주며 층에 도착하면 `arriveAtFloor()`로 전환.
+- selectNextRequestWhenStopped(): STOPPED일 때 가장 가까운 요청을 선택(거리가 같으면 위쪽 우선).
+- processMovementState(): 층간 LED로 애니메이션을 보여주며 층에 도착하면 `arriveAtFloor()`로 전환.
 - arriveAtFloor(): 도착 처리(층 LED ON, 도어 열림 시간 대기, 요청 클리어) 후 동일 방향 우선으로 다음 행동 결정.
 
 사용 팁

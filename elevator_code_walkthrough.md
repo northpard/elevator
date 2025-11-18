@@ -67,8 +67,8 @@
 1. readButtons() — 입력 처리
 2. updateBlinkStates() — 깜빡임 UX 업데이트
 3. syncRequestLedStates() — 요청과 버튼 LED 동기화
-4. scheduleNextTargetIfIdle() — 스케줄링(대기 시 목표 선택)
-5. runMovement() — 이동/도착 처리
+4. selectNextRequestWhenStopped() — 스케줄링(대기(STOPPED) 시 목표 선택)
+5. processMovementState() — 이동/도착 처리
 
 이 순서는 논블로킹 설계에 적합합니다.
 
@@ -101,14 +101,14 @@
 
 ---
 
-## 11) scheduleNextTargetIfIdle()
-- 정책: 대기 상태이면 가장 가까운 요청을 선택(동률이면 위쪽 우선)
+## 11) selectNextRequestWhenStopped()
+- 정책: `STOPPED` 상태이면 가장 가까운 요청을 선택(동률이면 위쪽 우선)
 - 권장:
   - 스케줄링 변경(예: 우선순위 큐, 승객 내부 버튼 추가 등)이 필요하면 이 함수에서 확장
 
 ---
 
-## 12) runMovement()
+## 12) processMovementState()
 - 역할: 층간 LED 애니메이션, 층 도착 판정, 도착 시 처리(도어 열림 시간 적용)
 - 동작 포인트:
   - 이동은 두 단계 애니메이션으로 구현됨
